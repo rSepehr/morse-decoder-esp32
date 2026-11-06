@@ -15,8 +15,20 @@ static char s_lastMorse[258] = {'\1', '\0'};
 static char s_lastText[258] = {'\1', '\0'};
 static bool s_layoutReady = false;
 
+static int getTextStartX() {
+    static int startX = 0;
+    if (startX == 0) {
+        int tw = tft.textWidth("TEXT: ", 4);
+        if (tw < 40) {
+            tw = 72;
+        }
+        startX = 5 + tw;
+    }
+    return startX;
+}
+
 static void wrapText(const char* text, int maxPixelWidth, int maxVisibleLines,
-                     char outputLines[][64], int& lineCount) {
+                     char outputLines[][64], int& lineCount, uint8_t font = 2) {
     lineCount = 0;
     if (!text || text[0] == '\0') {
         return;
@@ -38,7 +50,7 @@ static void wrapText(const char* text, int maxPixelWidth, int maxVisibleLines,
                 std::memcpy(candidate, currentLine, currentLen);
                 candidate[currentLen] = ' ';
                 candidate[currentLen + 1] = '\0';
-                if (tft.textWidth(candidate, 2) <= maxPixelWidth) {
+                if (tft.textWidth(candidate, font) <= maxPixelWidth) {
                     currentLine[currentLen++] = ' ';
                     currentLine[currentLen] = '\0';
                 }
@@ -60,7 +72,7 @@ static void wrapText(const char* text, int maxPixelWidth, int maxVisibleLines,
             if (candLen + wordLen < sizeof(candidate)) {
                 std::memcpy(candidate + candLen, text + wordStart, wordLen);
                 candidate[candLen + wordLen] = '\0';
-                if (tft.textWidth(candidate, 2) <= maxPixelWidth) {
+                if (tft.textWidth(candidate, font) <= maxPixelWidth) {
                     std::memcpy(currentLine, candidate, candLen + wordLen + 1);
                     currentLen = candLen + wordLen;
                     continue;
@@ -84,7 +96,7 @@ static void wrapText(const char* text, int maxPixelWidth, int maxVisibleLines,
                 testBuf[currentLen] = c;
                 testBuf[currentLen + 1] = '\0';
 
-                if (currentLen > 0 && tft.textWidth(testBuf, 2) > maxPixelWidth) {
+                if (currentLen > 0 && tft.textWidth(testBuf, font) > maxPixelWidth) {
                     if (count < 32) {
                         std::memcpy(lines[count], currentLine, currentLen + 1);
                         count++;
@@ -139,11 +151,13 @@ static void drawStaticLayout() {
     tft.drawString("Morse:", 5, 58, 2);
     tft.drawFastHLine(0, 107, w, TFT_DARKGREY);
 
-    // 110-206: Text area
-    tft.drawString("Text:", 5, 110, 2);
+    // 110-208: Text area
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.drawString("TEXT:", 5, 112, 4);
     tft.drawFastHLine(0, 209, w, TFT_DARKGREY);
 
     // 214-240: Status bar
+    tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
     tft.drawString("HOLD 2s = CLEAR", 5, 218, 2);
 
     (void)h;
@@ -249,19 +263,20 @@ void displayRender(const morse::Decoder& decoder) {
         }
     }
 
-    // 4. Decoded English text area (110-206 px, showing newest lines at 126, 142, 158, 174, 190)
+    // 4. Decoded English text area (110-208 px, showing newest lines at 112, 142, 172 in Font 4)
     const char* currentText = decoder.text();
     if (std::strcmp(currentText, s_lastText) != 0) {
         std::strncpy(s_lastText, currentText, sizeof(s_lastText) - 1);
         s_lastText[sizeof(s_lastText) - 1] = '\0';
 
-        tft.fillRect(5, 126, w - 10, 81, TFT_BLACK);
-        char lines[5][64];
+        int startX = getTextStartX();
+        tft.fillRect(startX, 110, w - startX, 98, TFT_BLACK);
+        char lines[3][64];
         int lineCount = 0;
-        wrapText(currentText, w - 10, 5, lines, lineCount);
+        wrapText(currentText, w - 5 - startX, 3, lines, lineCount, 4);
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
         for (int i = 0; i < lineCount; ++i) {
-            tft.drawString(lines[i], 5, 126 + i * 16, 2);
+            tft.drawString(lines[i], startX, 112 + i * 30, 4);
         }
     }
 }
